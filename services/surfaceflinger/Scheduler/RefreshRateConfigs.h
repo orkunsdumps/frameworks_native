@@ -184,9 +184,12 @@ public:
         bool touch = false;
         // True if the system hasn't seen any buffers posted to layers recently.
         bool idle = false;
+        // Whether the expiry for high refresh rate on heuristic layers has been reached.
+        bool heuristicIdle = false;
 
         bool operator==(GlobalSignals other) const {
-            return touch == other.touch && idle == other.idle;
+            return touch == other.touch && idle == other.idle
+                    && heuristicIdle == other.heuristicIdle;
         }
     };
 
@@ -203,9 +206,8 @@ public:
     std::optional<Fps> onKernelTimerChanged(std::optional<DisplayModeId> desiredActiveModeId,
                                             bool timerExpired) const EXCLUDES(mLock);
 
-    // Returns the lowest refresh rate according to the current policy. May change at runtime. Only
-    // uses the primary range, not the app request range.
-    DisplayModePtr getMinRefreshRateByPolicy() const EXCLUDES(mLock);
+    // Returns the lowest refresh rate supported by the display.
+    DisplayModePtr getMinRefreshRate() const EXCLUDES(mLock);
 
     // Returns the highest refresh rate according to the current policy. May change at runtime. Only
     // uses the primary range, not the app request range.
@@ -354,6 +356,10 @@ private:
         return getMaxRefreshRateByPolicyLocked(mActiveModeIt->second->getGroup());
     }
 
+    // Returns the current refresh rate, if allowed. Otherwise the default that is allowed by
+    // the policy.
+    const DisplayModePtr& getCurrentRefreshRateByPolicyLocked() const REQUIRES(mLock);
+
     const Policy* getCurrentPolicyLocked() const REQUIRES(mLock);
     bool isPolicyValidLocked(const Policy& policy) const REQUIRES(mLock);
 
@@ -384,6 +390,7 @@ private:
     DisplayModeIterator mActiveModeIt GUARDED_BY(mLock);
     DisplayModeIterator mMinRefreshRateModeIt GUARDED_BY(mLock);
     DisplayModeIterator mMaxRefreshRateModeIt GUARDED_BY(mLock);
+    DisplayModeIterator mIdleRefreshRateModeIt GUARDED_BY(mLock);
 
     // Display modes that satisfy the Policy's ranges, filtered and sorted by refresh rate.
     std::vector<DisplayModeIterator> mPrimaryRefreshRates GUARDED_BY(mLock);
